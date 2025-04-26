@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>News Style Image Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex flex-col items-center p-6 min-h-screen">
+  <h1 class="text-3xl font-extrabold mb-6 text-gray-800">News Style Image Generator</h1>
+  
+  <input type="file" id="imageUpload" accept="image/*" class="mb-4 w-full max-w-md p-2 border border-gray-300 rounded shadow-sm">
+
+  <!-- Tag + Color -->
+  <div class="flex flex-col gap-2 mb-4 w-full max-w-md">
+    <input type="text" id="tagInput" placeholder="Optional Tag (e.g., BREAKING)" class="p-2 border border-gray-300 rounded shadow-sm">
+
+    <div>
+      <label class="block mb-1 font-semibold text-gray-700">Choose Tag Color:</label>
+      <div id="colorPalette" class="flex gap-2 flex-wrap">
+        <button class="w-8 h-8 rounded-full bg-red-600" data-color="#DC2626"></button>
+        <button class="w-8 h-8 rounded-full bg-yellow-400" data-color="#FACC15"></button>
+        <button class="w-8 h-8 rounded-full bg-blue-500" data-color="#3B82F6"></button>
+        <button class="w-8 h-8 rounded-full bg-green-500" data-color="#22C55E"></button>
+        <button class="w-8 h-8 rounded-full bg-purple-500" data-color="#8B5CF6"></button>
+        <button class="w-8 h-8 rounded-full bg-black" data-color="#000000"></button>
+      </div>
+    </div>
+  </div>
+
+  <input type="text" id="headline" placeholder="Enter headline" class="mb-4 w-full max-w-md p-2 border border-gray-300 rounded shadow-sm">
+  
+  <button id="generateBtn" class="mb-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition">Generate Image</button>
+  
+  <canvas id="newsCanvas" width="800" height="450" class="mb-4 border border-gray-300 shadow-md"></canvas>
+  
+  <button id="downloadBtn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded shadow-lg transition">Download Image</button>
+
+  <script>
+    const imageUpload = document.getElementById('imageUpload');
+    const tagInput = document.getElementById('tagInput');
+    const headlineInput = document.getElementById('headline');
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const canvas = document.getElementById('newsCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let uploadedImage = null;
+    let selectedTagColor = '#DC2626'; // default red
+
+    // Color palette buttons
+    const colorButtons = document.querySelectorAll('#colorPalette button');
+    colorButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        selectedTagColor = button.getAttribute('data-color');
+        colorButtons.forEach(btn => btn.classList.remove('ring-4', 'ring-offset-2', 'ring-gray-300'));
+        button.classList.add('ring-4', 'ring-offset-2', 'ring-gray-300');
+      });
+    });
+
+    const logo = new Image();
+    logo.src = 'logo.png';
+    let logoLoaded = false;
+    logo.onload = () => logoLoaded = true;
+
+    imageUpload.addEventListener('change', (e) => {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        uploadedImage = new Image();
+        uploadedImage.onload = () => {
+          drawImageOnCanvas();
+        }
+        uploadedImage.src = event.target.result;
+      }
+      reader.readAsDataURL(e.target.files[0]);
+    });
+
+    function drawImageOnCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const aspectRatio = uploadedImage.width / uploadedImage.height;
+      let drawWidth = canvas.width;
+      let drawHeight = canvas.height;
+
+      if (aspectRatio > (canvas.width / canvas.height)) {
+        drawHeight = canvas.width / aspectRatio;
+      } else {
+        drawWidth = canvas.height * aspectRatio;
+      }
+
+      const x = (canvas.width - drawWidth) / 2;
+      const y = (canvas.height - drawHeight) / 2;
+      ctx.drawImage(uploadedImage, x, y, drawWidth, drawHeight);
+    }
+
+    function drawRoundedRect(x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function wrapText(context, text, x, y, maxWidth, lineHeight) {
+      const words = text.split(' ');
+      let line = '';
+      for(let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = context.measureText(testLine);
+        const testWidth = metrics.width;
+        if (testWidth > maxWidth && n > 0) {
+          context.fillText(line, x, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      context.fillText(line, x, y);
+    }
+
+    generateBtn.addEventListener('click', () => {
+      if (!uploadedImage) {
+        alert('Please upload an image first.');
+        return;
+      }
+
+      drawImageOnCanvas();
+
+      // Gradient overlay
+      const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - 200);
+      gradient.addColorStop(0, 'rgba(0,0,0,0.85)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
+
+      // Headline Text
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      let fontSize = 48;
+      ctx.font = `bold ${fontSize}px 'Roboto', sans-serif`;
+      const maxWidth = canvas.width - 80;
+      while (ctx.measureText(headlineInput.value).width > maxWidth && fontSize > 20) {
+        fontSize -= 2;
+        ctx.font = `bold ${fontSize}px 'Roboto', sans-serif`;
+      }
+
+      const headlineX = canvas.width / 2;
+      let headlineY = canvas.height - 60;
+      const lineHeight = fontSize * 1.2;
+
+      wrapText(ctx, headlineInput.value, headlineX, headlineY, maxWidth, lineHeight);
+
+      // Optional Tag
+      const tag = tagInput.value.trim().toUpperCase();
+      if (tag) {
+        let tagFontSize = 24;
+        ctx.font = `bold ${tagFontSize}px 'Roboto', sans-serif`;
+        const maxTagWidth = canvas.width * 0.5;
+
+        while (ctx.measureText(tag).width > maxTagWidth && tagFontSize > 12) {
+          tagFontSize -= 1;
+          ctx.font = `bold ${tagFontSize}px 'Roboto', sans-serif`;
+        }
+
+        const paddingX = 12;
+        const paddingY = 5;
+        const tagTextWidth = ctx.measureText(tag).width;
+        const tagWidth = tagTextWidth + paddingX * 2;
+        const tagHeight = tagFontSize + paddingY * 2;
+
+        const tagX = 20;
+        const tagY = 20;
+
+        ctx.fillStyle = selectedTagColor;
+        drawRoundedRect(tagX, tagY, tagWidth, tagHeight, tagHeight / 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = `bold ${tagFontSize}px 'Roboto', sans-serif`;
+        ctx.fillText(tag, tagX + tagWidth / 2, tagY + tagHeight / 2);
+      }
+
+      // Logo
+      if (logoLoaded && logo.complete) {
+        const logoSize = 60;
+        ctx.drawImage(logo, canvas.width - logoSize - 20, canvas.height - logoSize - 20, logoSize, logoSize);
+      }
+    });
+
+    downloadBtn.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'news_image.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+  </script>
+</body>
+</html>
