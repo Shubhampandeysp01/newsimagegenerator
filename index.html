@@ -16,7 +16,7 @@
     <input type="text" id="tagInput" placeholder="Optional Tag (e.g., BREAKING)" class="p-2 border border-gray-300 rounded shadow-sm">
 
     <div>
-      <label class="block mb-1 font-semibold text-gray-700">Choose Tag Color:</label>
+      <label class="block mb-1 font-semibold text-gray-700">Choose Tag and Gradient Color:</label>
       <div id="colorPalette" class="flex gap-2 flex-wrap">
         <button class="w-8 h-8 rounded-full bg-red-600" data-color="#DC2626"></button>
         <button class="w-8 h-8 rounded-full bg-yellow-400" data-color="#FACC15"></button>
@@ -32,8 +32,8 @@
   
   <button id="generateBtn" class="mb-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded shadow-lg transition">Generate Image</button>
   
-  <canvas id="newsCanvas" width="800" height="450" class="mb-4 border border-gray-300 shadow-md"></canvas>
-  
+  <canvas id="newsCanvas" class="hidden"></canvas>
+
   <button id="downloadBtn" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded shadow-lg transition">Download Image</button>
 
   <script>
@@ -47,6 +47,17 @@
 
     let uploadedImage = null;
     let selectedTagColor = '#DC2626'; // default red
+
+    // Helper function to convert hex color to RGB
+    function hexToRgb(hex) {
+      // Remove '#' if present
+      hex = hex.replace('#', '');
+      // Convert to RGB
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      return { r, g, b };
+    }
 
     // Color palette buttons
     const colorButtons = document.querySelectorAll('#colorPalette button');
@@ -68,7 +79,11 @@
       reader.onload = function(event) {
         uploadedImage = new Image();
         uploadedImage.onload = () => {
-          drawImageOnCanvas();
+          // Set canvas size to match image
+          canvas.width = uploadedImage.width;
+          canvas.height = uploadedImage.height;
+          canvas.classList.remove('hidden');
+          ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
         }
         uploadedImage.src = event.target.result;
       }
@@ -110,19 +125,27 @@
     function wrapText(context, text, x, y, maxWidth, lineHeight) {
       const words = text.split(' ');
       let line = '';
+      let lines = [];
       for(let n = 0; n < words.length; n++) {
         const testLine = line + words[n] + ' ';
         const metrics = context.measureText(testLine);
         const testWidth = metrics.width;
         if (testWidth > maxWidth && n > 0) {
-          context.fillText(line, x, y);
+          lines.push(line);
           line = words[n] + ' ';
-          y += lineHeight;
         } else {
           line = testLine;
         }
       }
-      context.fillText(line, x, y);
+      lines.push(line);
+
+      // Adjust y position based on number of lines
+      const totalHeight = lines.length * lineHeight;
+      let currentY = y - totalHeight + lineHeight; // Start higher to account for multiple lines
+      for (let i = 0; i < lines.length; i++) {
+        context.fillText(lines[i], x, currentY);
+        currentY += lineHeight;
+      }
     }
 
     generateBtn.addEventListener('click', () => {
@@ -133,28 +156,33 @@
 
       drawImageOnCanvas();
 
-      // Gradient overlay
-      const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - 200);
-      gradient.addColorStop(0, 'rgba(0,0,0,0.85)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      // Gradient overlay: use selected color with smoother blend
+      const gradientHeight = canvas.height * 0.3; // Cover 30% of canvas height
+      const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - gradientHeight);
+      const rgb = hexToRgb(selectedTagColor); // Convert selected color to RGB
+      gradient.addColorStop(0, `rgba(${rgb.r},${rgb.g},${rgb.b},1)`); // Fully opaque at bottom
+      gradient.addColorStop(0.3, `rgba(${rgb.r},${rgb.g},${rgb.b},0.8)`); // Strong color maintained
+      gradient.addColorStop(0.5, `rgba(${rgb.r},${rgb.g},${rgb.b},0.65)`); // Intermediate transition
+      gradient.addColorStop(0.75, `rgba(${rgb.r},${rgb.g},${rgb.b},0.4)`); // Softer fade
+      gradient.addColorStop(1, `rgba(${rgb.r},${rgb.g},${rgb.b},0)`); // Fully transparent at top
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
+      ctx.fillRect(0, canvas.height - gradientHeight, canvas.width, gradientHeight);
 
       // Headline Text
       ctx.fillStyle = 'white';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      let fontSize = 48;
+      let fontSize = 56;
       ctx.font = `bold ${fontSize}px 'Roboto', sans-serif`;
       const maxWidth = canvas.width - 80;
-      while (ctx.measureText(headlineInput.value).width > maxWidth && fontSize > 20) {
+      while (ctx.measureText(headlineInput.value).width > maxWidth && fontSize > 36) {
         fontSize -= 2;
         ctx.font = `bold ${fontSize}px 'Roboto', sans-serif`;
       }
 
       const headlineX = canvas.width / 2;
-      let headlineY = canvas.height - 60;
-      const lineHeight = fontSize * 1.2;
+      let headlineY = canvas.height - 100;
+      const lineHeight = fontSize * 1.4;
 
       wrapText(ctx, headlineInput.value, headlineX, headlineY, maxWidth, lineHeight);
 
